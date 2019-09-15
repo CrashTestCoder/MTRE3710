@@ -23,11 +23,11 @@ constexpr float min_range = .1;
 enum wall { left = 1, right = -1 };
 
 namespace ros_is_dumb   // ros has inefficient constructors
-{
+{                       // online they justify it by saying "remembering the order of parameters can be confusing"
     class vector3 : public geometry_msgs::Vector3
     {
     public:
-        vector3(double const& x, double const& y, double const& z) noexcept:
+        constexpr vector3(double const& x, double const& y, double const& z) noexcept:
             x{x}, y{y}, z{z}
         {}
     };
@@ -35,7 +35,7 @@ namespace ros_is_dumb   // ros has inefficient constructors
     class twist : public geometry_msgs::Twist
     {
     public:
-        twist(vector3 const& linear, vector3 const& angular) noexcept:
+        constexpr twist(vector3 const& linear, vector3 const& angular) noexcept:
             linear{linear}, angular{angular}
         {}
     };
