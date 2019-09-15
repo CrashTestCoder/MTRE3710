@@ -68,9 +68,10 @@ int main(int argc, char **argv)
             // Filter outliers that are too close
             while(1)
             {
-                auto& outlier = std::find_if(lidar_data.begin(),lidar_data.end(),[const& min_range](const auto& data) {
-                    return data < min_range;
-                });
+                auto& outlier = std::find_if(lidar_data.begin(),lidar_data.end(),
+                    [const& min_range](const auto& data) {
+                        return data < min_range;
+                    });
                 if(outlier == lidar_data.end())
                     break;
                 else 
@@ -78,7 +79,7 @@ int main(int argc, char **argv)
             }
             
             // find target angle
-            const auto& min_reading = min_element(lidar_data.begin(), lidar_data.end());
+            const auto& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
             const int min_pos = min_reading - lidar_data.begin();
 
             const double wall_angle = angle_min + angle_increment * min_pos;
