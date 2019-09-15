@@ -17,11 +17,21 @@
 using namespace std;
 using namespace geometry_msgs;
 
+/**********************************/
+/**** define program constants ****/
+/**********************************/
 constexpr float pi = 3.14159265;
 constexpr float min_range = .1;
 
 enum wall { left = 1, right = -1 };
 
+constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
+constexpr double setpoint = pi - pi/2 * follow;
+constexpr double setdist = .25;
+
+/*********************************/
+/*       make better stuff       */
+/*********************************/
 namespace ros_is_dumb   // ros has inefficient constructors
 {                       // online they justify it by saying "remembering the order of parameters can be confusing"
     class vector3 : public geometry_msgs::Vector3
@@ -41,10 +51,16 @@ namespace ros_is_dumb   // ros has inefficient constructors
     };
 };
 
+/*********************************/
+/*         program logic         */
+/*********************************/
 vector<float> lidar_data;
 float angle_increment;
 float angle_min;
 float angle_max;
+/**
+ * Loads data from lidar and stores it in global variables
+ */
 void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
 {
     lidar_data = scan->ranges;
@@ -71,10 +87,6 @@ int main(int argc, char **argv)
     ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
 
-    constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
-    constexpr double setpoint = pi - pi/2 * follow;
-    constexpr double setdist = .25;
-
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
@@ -94,7 +106,7 @@ int main(int argc, char **argv)
                     *outlier = inf;
             }
             
-            // find target angle
+            // find wall angle
             auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
             int const min_pos = min_reading - lidar_data.begin();
 
