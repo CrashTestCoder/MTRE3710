@@ -1,15 +1,20 @@
+/**
+ * Lab 3 - Wall Follower
+ * 
+ * Authors:
+ *      Ryan McHale
+ *      Link Reilly
+ */
+
 #include "ros/ros.h"
 #include "geometry_msgs/Twist.h"
 #include "geometry_msgs/Vector3.h"
 #include "sensor_msgs/LaserScan.h"
-// %EndTag(MSG_HEADER)%
 
 #include <vector>
 #include <algorithm>
-#include <chrono>
 
 using namespace std;
-using namespace std::chrono;
 using namespace geometry_msgs;
 
 const float pi = 3.14159265;
@@ -40,7 +45,7 @@ double rel_angle(double angle, double reference)
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "talker");
+    ros::init(argc, argv, "lab3");
 
     ros::NodeHandle n;
     ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
@@ -57,7 +62,7 @@ int main(int argc, char **argv)
 
     while (ros::ok())
     {
-        if(!lidar_data.empty())
+        if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
             const wall follow = wall::right;
             const double setpoint = pi - pi/2 * follow;
@@ -76,13 +81,11 @@ int main(int argc, char **argv)
 
             // tendancy to move to a set distance from
             y_err = (*min_reading - setdist) * follow;
-            double find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
+            const double find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
 
             // set ouputs
             yaw = 10*yaw_err+ 8*find_distance;
             x = .5;
-
-            cout << y_err << '\t' << yaw << '\t' << yaw_err << '\n';
 
             // Create velocity vector
             Vector3 linear;
@@ -102,28 +105,8 @@ int main(int argc, char **argv)
         }
 
         ros::spinOnce();
-        //loop_rate.sleep();
-        //ros::Rate(5000);
         ++count;
     }
-
-    geometry_msgs::Twist msg;
-    
-    // Create velocity vector
-    Vector3 linear;
-    linear.x = 0;
-    linear.y = 0;
-    linear.z = 0;
-    msg.linear = linear;
-
-    // Create angular velocity vector
-    Vector3 angular;
-    angular.x = 0;
-    angular.y = 0;
-    angular.z = 0;
-    msg.angular = angular;
-
-    cmd_vel.publish(msg);
 
     return 0;
 }
