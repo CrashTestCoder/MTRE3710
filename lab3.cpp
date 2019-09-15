@@ -79,12 +79,30 @@ constexpr double rel_angle(double const& angle, double const& reference)
     return atan2(sin(reference-angle), cos(reference-angle));
 }
 
+template<typename T>
+void filter_values_too_small(std::vector<T>& v, T min_val)
+{
+    // Filter outliers that are too close
+    while(1)
+    {
+        auto& outlier = std::find_if(v.begin(),v.end(),
+            [const& min_val](auto const& data) {
+                return data < min_range;
+            });
+        if(outlier == v.end())
+            break;
+
+        cout << *outlier << '\n';
+        *outlier = inf;
+    }
+}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "lab3");
 
     ros::NodeHandle n;
-    ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+    ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
 
     while (ros::ok())
@@ -93,18 +111,8 @@ int main(int argc, char **argv)
         {
             geometry_msgs::Twist twist;
 
-            // Filter outliers that are too close
-            while(1)
-            {
-                auto& outlier = std::find_if(lidar_data.begin(),lidar_data.end(),
-                    [const& min_range](auto const& data) {
-                        return data < min_range;
-                    });
-                if(outlier == lidar_data.end())
-                    break;
-                else 
-                    *outlier = inf;
-            }
+            // make sure it doesn't track itself
+            filter_values_too_small(lidar_data, min_range);
             
             // find wall angle
             auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
