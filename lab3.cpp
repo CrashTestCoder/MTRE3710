@@ -17,11 +17,11 @@
 using namespace std;
 using namespace geometry_msgs;
 
-const float pi = 3.14159265;
+constexpr float pi = 3.14159265;
 
 enum wall { left = 1, right = -1 };
 
-vector<float> lidar_data;
+std::vector<float> lidar_data;
 float angle_increment;
 float angle_min;
 float angle_max;
@@ -38,7 +38,7 @@ void processLaserScan(const sensor_msgs::LaserScan::ConstPtr &scan)
  * Ex:
  *      pi/2 = rel_angle(3*pi/2, pi);
  */
-double rel_angle(double angle, double reference)
+constexpr double rel_angle(const double& angle, const double& reference)
 {
     return atan2(sin(reference-angle), cos(reference-angle));
 }
@@ -62,10 +62,10 @@ int main(int argc, char **argv)
             const double setpoint = pi - pi/2 * follow;
             const double setdist = .25;
 
-            geometry_msgs::Twist msg;
+            geometry_msgs::Twist twist;
             
             // find target angle
-            const auto min_reading = min_element(lidar_data.begin(), lidar_data.end());
+            const auto min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
             const int min_pos = min_reading - lidar_data.begin();
 
             const double wall_angle = angle_min + angle_increment * min_pos;
@@ -86,16 +86,16 @@ int main(int argc, char **argv)
             linear.x = x;
             linear.y = y;
             linear.z = z;
-            msg.linear = linear;
+            twist.linear = linear;
 
             // Create angular velocity vector
             Vector3 angular;
             angular.x = roll;
             angular.y = pitch;
             angular.z = yaw;
-            msg.angular = angular;
+            twist.angular = angular;
 
-            cmd_vel.publish(msg);
+            cmd_vel.publish(twist);
         }
 
         ros::spinOnce();
