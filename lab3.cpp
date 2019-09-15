@@ -15,17 +15,17 @@
 #include <algorithm>
 
 using namespace std;
-using namespace geometry_twists;
+using namespace geometry_msgs;
 
 const float pi = 3.14159265;
 
 enum wall { left = 1, right = -1 };
 
-std::vector<float> lidar_data;
+vector<float> lidar_data;
 float angle_increment;
 float angle_min;
 float angle_max;
-void processLaserScan(const sensor_twists::LaserScan::ConstPtr &scan)
+void processLaserScan(const sensor_msgs::LaserScan::ConstPtr &scan)
 {
     lidar_data = scan->ranges;
     angle_increment = scan->angle_increment;
@@ -38,7 +38,7 @@ void processLaserScan(const sensor_twists::LaserScan::ConstPtr &scan)
  * Ex:
  *      pi/2 = rel_angle(3*pi/2, pi);
  */
-constexpr double rel_angle(const double& angle, const double& reference)
+double rel_angle(double angle, double reference)
 {
     return atan2(sin(reference-angle), cos(reference-angle));
 }
@@ -48,24 +48,24 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "lab3");
 
     ros::NodeHandle n;
-    ros::Publisher cmd_vel = n.advertise<geometry_twists::Twist>("/cmd_vel", 1000);
-    ros::Subscriber sub = n.subscribe<sensor_twists::LaserScan>("/scan", 10, &processLaserScan);
+    ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
 
     double x = 0, y = 0, z = 0, roll = 0, pitch = 0, yaw = 0;
     double yaw_err, y_err;
-
-    constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
-    constexpr double setpoint = pi - pi/2 * follow;
-    constexpr double setdist = .25;
 
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
-            geometry_msgs::Twist twist;
+            const wall follow = wall::right; // for when zane decides the robot should go the other way...
+            const double setpoint = pi - pi/2 * follow;
+            const double setdist = .25;
+
+            geometry_msgs::Twist msg;
             
             // find target angle
-            const auto min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
+            const auto min_reading = min_element(lidar_data.begin(), lidar_data.end());
             const int min_pos = min_reading - lidar_data.begin();
 
             const double wall_angle = angle_min + angle_increment * min_pos;
@@ -82,20 +82,20 @@ int main(int argc, char **argv)
             x = .5;
 
             // Create velocity vector
-            sensor_twists::Vector3 linear;
+            Vector3 linear;
             linear.x = x;
             linear.y = y;
             linear.z = z;
-            twist.linear = linear;
+            msg.linear = linear;
 
             // Create angular velocity vector
-            sensor_twists::Vector3 angular;
+            Vector3 angular;
             angular.x = roll;
             angular.y = pitch;
             angular.z = yaw;
-            twist.angular = angular;
+            msg.angular = angular;
 
-            cmd_vel.publish(twist);
+            cmd_vel.publish(msg);
         }
 
         ros::spinOnce();
