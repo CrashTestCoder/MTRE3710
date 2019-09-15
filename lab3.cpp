@@ -17,7 +17,8 @@
 using namespace std;
 using namespace geometry_msgs;
 
-const float pi = 3.14159265;
+constexpr float pi = 3.14159265;
+constexpr float min_range = .1;
 
 enum wall { left = 1, right = -1 };
 
@@ -59,19 +60,30 @@ int main(int argc, char **argv)
     
     double yaw_err, y_err;
 
+    constexpr wall follow = wall::right;
+    constexpr double setpoint = pi - pi/2 * follow;
+    constexpr double setdist = .25;
 
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
-            const wall follow = wall::right;
-            const double setpoint = pi - pi/2 * follow;
-            const double setdist = .25;
-
             geometry_msgs::Twist msg;
+
+            // Filter outliers that are too close
+            while(1)
+            {
+                auto& outlier = std::find_if(lidar_data.begin(),lidar_data.end(),[const& min_range](const auto& data) {
+                    return data < min_range;
+                });
+                if(outlier == lidar_data.end())
+                    break;
+                else 
+                    *outlier = inf;
+            }
             
             // find target angle
-            const auto min_reading = min_element(lidar_data.begin(), lidar_data.end());
+            const auto& min_reading = min_element(lidar_data.begin(), lidar_data.end());
             const int min_pos = min_reading - lidar_data.begin();
 
             const double wall_angle = angle_min + angle_increment * min_pos;
