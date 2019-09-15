@@ -17,8 +17,7 @@
 using namespace std;
 using namespace geometry_msgs;
 
-constexpr float pi = 3.14159265;
-constexpr float min_range = .1;
+const float pi = 3.14159265;
 
 enum wall { left = 1, right = -1 };
 
@@ -64,21 +63,9 @@ int main(int argc, char **argv)
             const double setdist = .25;
 
             geometry_msgs::Twist msg;
-
-            // Filter outliers that are too close
-            while(1)
-            {
-                auto& outlier = std::find_if(lidar_data.begin(),lidar_data.end(),[const& min_range](const auto& data) {
-                    return data < min_range;
-                });
-                if(outlier == lidar_data.end())
-                    break;
-                else 
-                    *outlier = inf;
-            }
             
             // find target angle
-            const auto& min_reading = min_element(lidar_data.begin(), lidar_data.end());
+            const auto min_reading = min_element(lidar_data.begin(), lidar_data.end());
             const int min_pos = min_reading - lidar_data.begin();
 
             const double wall_angle = angle_min + angle_increment * min_pos;
