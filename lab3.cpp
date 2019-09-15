@@ -51,20 +51,14 @@ int main(int argc, char **argv)
     ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
 
-    ros::Rate loop_rate(2);
-    int count = 0;
-
     double x = 0, y = 0, z = 0, roll = 0, pitch = 0, yaw = 0;
-    double pre_x = .1, pre_y = 0, pre_z = 0, pre_roll = 0, pre_pitch = 0, pre_yaw = 0;
-    
     double yaw_err, y_err;
-
 
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
-            const wall follow = wall::right;
+            const wall follow = wall::right; // for when zane decides the robot should go the other way...
             const double setpoint = pi - pi/2 * follow;
             const double setdist = .25;
 
@@ -105,7 +99,6 @@ int main(int argc, char **argv)
         }
 
         ros::spinOnce();
-        ++count;
     }
 
     return 0;
