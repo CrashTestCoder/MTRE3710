@@ -55,15 +55,15 @@ int main(int argc, char **argv)
     double x = 0, y = 0, z = 0, roll = 0, pitch = 0, yaw = 0;
     double yaw_err, y_err;
 
+    constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
+    constexpr double setpoint = pi - pi/2 * follow;
+    constexpr double setdist = .25;
+
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
-            const wall follow = wall::right; // for when zane decides the robot should go the other way...
-            const double setpoint = pi - pi/2 * follow;
-            const double setdist = .25;
-
-            geometry_msgs::Twist msg;
+            geometry_msgs::Twist twist;
 
             // Filter outliers that are too close
             while(1)
@@ -100,16 +100,16 @@ int main(int argc, char **argv)
             linear.x = x;
             linear.y = y;
             linear.z = z;
-            msg.linear = linear;
+            twist.linear = linear;
 
             // Create angular velocity vector
             Vector3 angular;
             angular.x = roll;
             angular.y = pitch;
             angular.z = yaw;
-            msg.angular = angular;
+            twist.angular = angular;
 
-            cmd_vel.publish(msg);
+            cmd_vel.publish(twist);
         }
 
         ros::spinOnce();
