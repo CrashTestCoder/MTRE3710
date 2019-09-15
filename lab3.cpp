@@ -73,7 +73,7 @@ int main(int argc, char **argv)
             // calculate correction angle
             yaw_err = rel_angle(setpoint, wall_angle);
 
-            // tendancy to move to a set distance from
+            // tendancy to move to a set distance from the wall
             y_err = (*min_reading - setdist) * follow;
             const double find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
 
