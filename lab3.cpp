@@ -13,19 +13,33 @@
 
 #include <vector>
 #include <algorithm>
+#include <limits>
 
 using namespace std;
 using namespace geometry_msgs;
 
+/**********************************/
+/**** define program constants ****/
+/**********************************/
 constexpr float pi = 3.14159265;
 
 enum wall { left = 1, right = -1 };
 
-std::vector<float> lidar_data;
+constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
+constexpr double setpoint = pi - pi/2 * follow;
+constexpr double setdist = .25;
+
+/*********************************/
+/*         program logic         */
+/*********************************/
+vector<float> lidar_data;
 float angle_increment;
 float angle_min;
 float angle_max;
-void processLaserScan(const sensor_msgs::LaserScan::ConstPtr &scan)
+/**
+ * Loads data from lidar and stores it in global variables
+ */
+static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
 {
     lidar_data = scan->ranges;
     angle_increment = scan->angle_increment;
@@ -38,7 +52,7 @@ void processLaserScan(const sensor_msgs::LaserScan::ConstPtr &scan)
  * Ex:
  *      pi/2 = rel_angle(3*pi/2, pi);
  */
-constexpr double rel_angle(const double& angle, const double& reference)
+constexpr double rel_angle(double const& angle, double const& reference)
 {
     return atan2(sin(reference-angle), cos(reference-angle));
 }
@@ -48,52 +62,32 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "lab3");
 
     ros::NodeHandle n;
-    ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+    ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
 
-    double x = 0, y = 0, z = 0, roll = 0, pitch = 0, yaw = 0;
-    double yaw_err, y_err;
-
-    constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
-    constexpr double setpoint = pi - pi/2 * follow;
-    constexpr double setdist = .25;
-
+    // This is initialized outside of the loop because ros is bad at initializing things efficiently
+    geometry_msgs::Twist twist;
+    
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
-            geometry_msgs::Twist twist;
-            
-            // find target angle
-            const auto min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
-            const int min_pos = min_reading - lidar_data.begin();
+            // find wall angle
+            auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
+            int const min_pos = min_reading - lidar_data.begin();
 
-            const double wall_angle = angle_min + angle_increment * min_pos;
+            double const wall_angle = angle_min + angle_increment * min_pos;
 
             // calculate correction angle
-            yaw_err = rel_angle(setpoint, wall_angle);
+            double const yaw_err = rel_angle(setpoint, wall_angle);
 
             // tendancy to move to a set distance from the wall
-            y_err = (*min_reading - setdist) * follow;
-            const double find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
+            double const y_err = (*min_reading - setdist) * follow;
+            double const find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
 
             // set ouputs
-            yaw = 10*yaw_err+ 8*find_distance;
-            x = .5;
-
-            // Create velocity vector
-            Vector3 linear;
-            linear.x = x;
-            linear.y = y;
-            linear.z = z;
-            twist.linear = linear;
-
-            // Create angular velocity vector
-            Vector3 angular;
-            angular.x = roll;
-            angular.y = pitch;
-            angular.z = yaw;
-            twist.angular = angular;
+            twist.linear.x = .5;
+            twist.angular.z = 10*yaw_err + 8*find_distance;
 
             cmd_vel.publish(twist);
         }
