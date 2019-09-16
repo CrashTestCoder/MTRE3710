@@ -58,24 +58,6 @@ constexpr double rel_angle(double const& angle, double const& reference)
     return atan2(sin(reference-angle), cos(reference-angle));
 }
 
-template<typename T>
-constexpr void filter_values_too_small(std::vector<T>& v, T const& min_val)
-{
-    // Filter outliers that are too close to the sensor
-    while(1)
-    {
-        auto outlier = std::find_if(v.begin(),v.end(),
-            [& min_val](auto const& data) {
-                return data < min_val;
-            });
-        if(outlier == v.end())
-            break;
-
-        std::cout << *outlier << '\n'; // This function is pointless if this is never called
-        *outlier = std::numeric_limits<T>::infinity();
-    }
-}
-
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "lab3");
@@ -84,17 +66,17 @@ int main(int argc, char **argv)
     ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
 
-    // These are initialized outside of the loop because ros is bad at initializing things efficiently
+    // This is initialized outside of the loop because ros is bad at initializing things efficiently
     geometry_msgs::Twist twist;
-    geometery_msgs::Vector3 linear;
-    geometery_msgs::Vector3 angular;
     
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
             // make sure it doesn't track itself
-            filter_values_too_small(lidar_data, min_range);
+            std::replace_if(lidar_data.begin(), lidar_data.end(), [](auto const& data) noexcept {
+                return data < min_range;
+            }, std::numeric_limits<float>::infinity());
             
             // find wall angle
             auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
@@ -110,11 +92,8 @@ int main(int argc, char **argv)
             double const find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
 
             // set ouputs
-            linear.x = .5;
-            angular.z = 10*yaw_err + 8*find_distance;
-
-            twist.linear = linear;
-            twist.angular = angular;
+            twist.linear.x = .5;
+            twist.angular.z = 10*yaw_err + 8*find_distance;
 
             cmd_vel.publish(twist);
         }
