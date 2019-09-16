@@ -30,28 +30,6 @@ constexpr double setpoint = pi - pi/2 * follow;
 constexpr double setdist = .25;
 
 /*********************************/
-/*       make better stuff       */
-/*********************************/
-namespace ros_is_dumb   // ros has inefficient constructors
-{                       // online they justify it by saying "remembering the order of parameters can be confusing"
-    class vector3 : public geometry_msgs::Vector3
-    {
-    public:
-        constexpr vector3(double const& x, double const& y, double const& z) noexcept:
-            x{x}, y{y}, z{z}
-        {}
-    };
-
-    class twist : public geometry_msgs::Twist
-    {
-    public:
-        constexpr twist(vector3 const& linear, vector3 const& angular) noexcept:
-            linear{linear}, angular{angular}
-        {}
-    };
-};
-
-/*********************************/
 /*         program logic         */
 /*********************************/
 vector<float> lidar_data;
@@ -61,7 +39,7 @@ float angle_max;
 /**
  * Loads data from lidar and stores it in global variables
  */
-void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
+static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
 {
     lidar_data = scan->ranges;
     angle_increment = scan->angle_increment;
@@ -74,13 +52,13 @@ void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
  * Ex:
  *      pi/2 = rel_angle(3*pi/2, pi);
  */
-constexpr double rel_angle(double const& angle, double const& reference)
+static double rel_angle(double const& angle, double const& reference)
 {
     return atan2(sin(reference-angle), cos(reference-angle));
 }
 
 template<typename T>
-void filter_values_too_small(std::vector<T>& v, T min_val)
+static void filter_values_too_small(std::vector<T>& v, T min_val)
 {
     // Filter outliers that are too close
     while(1)
@@ -92,7 +70,7 @@ void filter_values_too_small(std::vector<T>& v, T min_val)
         if(outlier == v.end())
             break;
 
-        cout << *outlier << '\n';
+        cout << *outlier << '\n'; // This function is pointless if this is never called
         *outlier = inf;
     }
 }
@@ -105,12 +83,15 @@ int main(int argc, char **argv)
     ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
 
+    // These are initialized outside of the loop because ros is bad at initializing things efficiently
+    geometry_msgs::Twist twist;
+    geometery_msgs::Vector3 linear;
+    geometery_msgs::Vector3 angular;
+    
     while (ros::ok())
     {
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
-            geometry_msgs::Twist twist;
-
             // make sure it doesn't track itself
             filter_values_too_small(lidar_data, min_range);
             
@@ -128,10 +109,13 @@ int main(int argc, char **argv)
             double const find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
 
             // set ouputs
-            double const yaw = 10*yaw_err+ 8*find_distance;
-            double const x = .5;
+            linear.x = .5;
+            angular.z = 10*yaw_err + 8*find_distance;
 
-            cmd_vel.publish(ros_is_dumb::twist({x,0,0},{0,0,yaw}));
+            twist.linear = linear;
+            twist.angular = angular;
+
+            cmd_vel.publish(twist);
         }
 
         ros::spinOnce();
