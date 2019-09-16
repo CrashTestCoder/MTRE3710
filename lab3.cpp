@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <limits>
 
 using namespace std;
 using namespace geometry_msgs;
@@ -52,26 +53,26 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
  * Ex:
  *      pi/2 = rel_angle(3*pi/2, pi);
  */
-static double rel_angle(double const& angle, double const& reference)
+constexpr double rel_angle(double const& angle, double const& reference)
 {
     return atan2(sin(reference-angle), cos(reference-angle));
 }
 
 template<typename T>
-static void filter_values_too_small(std::vector<T>& v, T min_val)
+constexpr void filter_values_too_small(std::vector<T>& v, T const& min_val)
 {
-    // Filter outliers that are too close
+    // Filter outliers that are too close to the sensor
     while(1)
     {
-        auto& outlier = std::find_if(v.begin(),v.end(),
-            [const& min_val](auto const& data) {
-                return data < min_range;
+        auto outlier = std::find_if(v.begin(),v.end(),
+            [& min_val](auto const& data) {
+                return data < min_val;
             });
         if(outlier == v.end())
             break;
 
-        cout << *outlier << '\n'; // This function is pointless if this is never called
-        *outlier = inf;
+        std::cout << *outlier << '\n'; // This function is pointless if this is never called
+        *outlier = std::numeric_limits<T>::infinity();
     }
 }
 
