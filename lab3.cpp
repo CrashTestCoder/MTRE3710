@@ -22,7 +22,7 @@ using namespace geometry_msgs;
 /**** define program constants ****/
 /**********************************/
 constexpr float pi = 3.14159265;
-constexpr float min_range = .1;
+constexpr float min_range = .05;
 
 enum wall { left = -1, right = 1 };
 
