@@ -74,7 +74,7 @@ int main(int argc, char **argv)
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
             // make sure it doesn't track itself
-            std::replace_if(lidar_data.begin(), lidar_data.end(), [](auto const& data) noexcept {
+            std::replace_if(lidar_data.begin(), lidar_data.end(), [](float const& data) noexcept {
                 return data < min_range;
             }, std::numeric_limits<float>::infinity());
             
