@@ -22,9 +22,9 @@ using namespace geometry_msgs;
 /**** define program constants ****/
 /**********************************/
 constexpr float pi = 3.14159265;
-constexpr float min_range = .1;
+constexpr float min_range = .05;
 
-enum wall { left = 1, right = -1 };
+enum wall { left = -1, right = 1 };
 
 constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
 constexpr double setpoint = pi - pi/2 * follow;
