@@ -27,8 +27,9 @@ constexpr float min_range = .05;
 enum wall { left = 1, right = -1 };
 
 constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
-constexpr auto setpoint = pi - pi/2 * follow;
-constexpr auto setdist = .25;
+constexpr float setpoint = pi - pi/2 * follow;
+constexpr float setdist = .25;
+constexpr float speed = .25;
 
 /*********************************/
 /*         program logic         */
@@ -92,7 +93,7 @@ int main(int argc, char **argv)
             float const find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
 
             // set ouputs
-            twist.linear.x = .5;
+            twist.linear.x = speed;
             twist.angular.z = 10*yaw_err + 8*find_distance;
 
             cmd_vel.publish(twist);
