@@ -27,8 +27,8 @@ constexpr float min_range = .05;
 enum wall { left = -1, right = 1 };
 
 constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
-constexpr double setpoint = pi - pi/2 * follow;
-constexpr double setdist = .25;
+constexpr auto setpoint = pi - pi/2 * follow;
+constexpr auto setdist = .25;
 
 /*********************************/
 /*         program logic         */
@@ -53,7 +53,7 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
  * Ex:
  *      pi/2 = rel_angle(3*pi/2, pi);
  */
-constexpr double rel_angle(double const& angle, double const& reference)
+constexpr auto rel_angle(auto const& angle, auto const& reference)
 {
     return atan2(sin(reference-angle), cos(reference-angle));
 }
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
         if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
         {
             // make sure it doesn't track itself
-            std::replace_if(lidar_data.begin(), lidar_data.end(), [](float const& data) noexcept {
+            std::replace_if(lidar_data.begin(), lidar_data.end(), [](auto const& data) noexcept {
                 return data < min_range;
             }, std::numeric_limits<float>::infinity());
             
@@ -82,14 +82,14 @@ int main(int argc, char **argv)
             auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
             int const min_pos = min_reading - lidar_data.begin();
 
-            double const wall_angle = angle_min + angle_increment * min_pos;
+            float const wall_angle = angle_min + angle_increment * min_pos;
 
             // calculate correction angle
-            double const yaw_err = rel_angle(setpoint, wall_angle);
+            float const yaw_err = rel_angle(setpoint, wall_angle);
 
             // tendancy to move to a set distance from the wall
-            double const y_err = (*min_reading - setdist) * follow;
-            double const find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
+            float const y_err = (*min_reading - setdist) * follow;
+            float const find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
 
             // set ouputs
             twist.linear.x = .5;
