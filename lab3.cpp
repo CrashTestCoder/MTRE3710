@@ -14,9 +14,16 @@
 #include <vector>
 #include <algorithm>
 #include <limits>
+#include <stdio.h>
+#include <unistd.h>
+#include <termios.h>
 
 using namespace std;
 using namespace geometry_msgs;
+
+#define CoarseMode
+//#define SPEED 1
+
 
 /**********************************/
 /**** define program constants ****/
@@ -24,20 +31,66 @@ using namespace geometry_msgs;
 constexpr float pi = 3.14159265;
 constexpr float min_range = .05;
 
-enum wall { left = 1, right = -1 };
+enum wall { left = -1, right = 1 };
 
-constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
-constexpr float setpoint = pi - pi/2 * follow;
-constexpr float setdist = .25;
-constexpr float speed = .25;
+constexpr wall follow = wall::left; // for when zane decides the robot should go the other way...
+constexpr double setpoint = pi - pi/2 * follow;
 
-/*********************************/
-/*         program logic         */
-/*********************************/
+#ifdef CoarseMode
+constexpr double setdist = .2; // .27
+#elif SPEED
+constexpr double setdist = .3; // .27
+#else
+constexpr double setdist = .3; // .27
+#endif
+
+// For non-blocking keyboard inputs
+int getch(void)
+{
+	int ch;
+	struct termios oldt;
+	struct termios newt;
+
+	// Store old settings, and copy to new settings
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+
+	// Make required changes and apply the settings
+	newt.c_lflag &= ~(ICANON | ECHO);
+	newt.c_iflag |= IGNBRK;
+	newt.c_iflag &= ~(INLCR | ICRNL | IXON | IXOFF);
+	newt.c_lflag &= ~(ICANON | ECHO | ECHOK | ECHOE | ECHONL | ISIG | IEXTEN);
+	newt.c_cc[VMIN] = 0;
+	newt.c_cc[VTIME] = .000001;
+	tcsetattr(fileno(stdin), TCSANOW, &newt);
+
+	// Get the current character
+	ch = getchar();
+
+	// Reapply old settings
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
+	return ch;
+}
+
+/**
+ * returns the difference between two angles
+ * Ex:
+ *      pi/2 = rel_angle(3*pi/2, pi);
+ */
+constexpr double rel_angle(double const& angle, double const& reference)
+{
+    return atan2(sin(reference-angle), cos(reference-angle));
+}
+
+
+
+ros::Publisher cmd_vel;
 vector<float> lidar_data;
 float angle_increment;
 float angle_min;
 float angle_max;
+geometry_msgs::Twist twist;
 /**
  * Loads data from lidar and stores it in global variables
  */
@@ -47,16 +100,43 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
     angle_increment = scan->angle_increment;
     angle_min = scan->angle_min;
     angle_max = scan->angle_max;
-}
 
-/**
- * returns the difference between two angles
- * Ex:
- *      pi/2 = rel_angle(3*pi/2, pi);
- */
-constexpr auto rel_angle(auto const& angle, auto const& reference)
-{
-    return atan2(sin(reference-angle), cos(reference-angle));
+    // make sure it doesn't track itself
+    std::replace_if(lidar_data.begin(), lidar_data.end(), [](float const& data) noexcept {
+        return data < min_range;
+    }, std::numeric_limits<float>::infinity());
+    
+    // find wall angle
+    auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
+    int const min_pos = min_reading - lidar_data.begin();
+
+    double const wall_angle = angle_min + angle_increment * min_pos;
+
+    // calculate correction angle
+    double const yaw_err = rel_angle(setpoint, wall_angle);
+
+    // tendancy to move to a set distance from the wall
+    double const y_err = (*min_reading - setdist) * -follow;
+    double const find_distance = y_err * y_err * y_err * atan(-y_err) * sin(wall_angle);
+
+    // set ouputs
+
+#ifdef CoarseMode
+    twist.linear.x = .3;
+    twist.angular.z = twist.linear.x*7*(2.2*yaw_err + 1.7*y_err);
+#elif SPEED
+    twist.linear.x = 1;
+    twist.angular.z = twist.linear.x*6*(1*yaw_err + .8*y_err);
+#else
+    twist.linear.x = .3;
+    twist.angular.z = twist.linear.x*8*(1*yaw_err + .8*y_err);
+#endif
+
+    if(yaw_err > 1) twist.linear.x = 0.05;//, twist.angular.z *=3;
+
+    cout << yaw_err << '\n';
+
+    cmd_vel.publish(twist);
 }
 
 int main(int argc, char **argv)
@@ -64,43 +144,13 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "lab3");
 
     ros::NodeHandle n;
-    ros::Publisher cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
-    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 10, &processLaserScan);
-
-    // This is initialized outside of the loop because ros is bad at initializing things efficiently
-    geometry_msgs::Twist twist;
+    cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
+    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 1, &processLaserScan);
     
-    while (ros::ok())
-    {
-        if(!lidar_data.empty()) // it's empty for the first few iterations for some reason...
-        {
-            // make sure it doesn't track itself
-            std::replace_if(lidar_data.begin(), lidar_data.end(), [](auto const& data) noexcept {
-                return data < min_range;
-            }, std::numeric_limits<float>::infinity());
-            
-            // find wall angle
-            auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
-            int const min_pos = min_reading - lidar_data.begin();
+    ros::spin();
 
-            float const wall_angle = angle_min + angle_increment * min_pos;
-
-            // calculate correction angle
-            float const yaw_err = rel_angle(setpoint, wall_angle);
-
-            // tendancy to move to a set distance from the wall
-            float const y_err = (*min_reading - setdist) * follow;
-            float const find_distance = y_err*y_err*y_err*atan(-y_err) * sin(wall_angle);
-
-            // set ouputs
-            twist.linear.x = speed;
-            twist.angular.z = 10*yaw_err + 8*find_distance;
-
-            cmd_vel.publish(twist);
-        }
-
-        ros::spinOnce();
-    }
+    twist = geometry_msgs::Twist();
+    cmd_vel.publish(twist);
 
     return 0;
 }
