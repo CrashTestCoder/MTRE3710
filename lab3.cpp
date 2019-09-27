@@ -21,8 +21,8 @@
 using namespace std;
 using namespace geometry_msgs;
 
-#define CoarseMode
-//#define SPEED 1
+//#define CoarseMode
+#define SPEED 1
 
 
 /**********************************/
