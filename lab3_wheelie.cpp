@@ -10,6 +10,8 @@
 #include "geometry_msgs/Twist.h"
 #include "geometry_msgs/Vector3.h"
 #include "sensor_msgs/LaserScan.h"
+#include "sensor_msgs/Imu.h"
+#include <tf/transform_datatypes.h>
 
 #include "complex.hpp"
 
@@ -86,26 +88,24 @@ void start_wheelie()
     RM::wait(200ms);
 }
 
-constexpr float get_wheelie_angle(float const dist) noexcept
+static void get_wheelie_angle(sensor_msgs::Imu::ConstPtr const& imu)
 {
-    constexpr float wheel_radius = .02;
-    constexpr float lidar_pos_y = .06;
-    constexpr float lidar_pos_x = .04;
-    float const lidar_hyp = std::sqrt(lidar_pos_x*lidar_pos_x+lidar_pos_y+lidar_pos_y);
-
-    rm::complex const num { wheel_radius, -std::sqrt(dist*dist - wheel_radius*wheel_radius + lidar_hyp*lidar_hyp) };
-    rm::complex const den { lidar_hyp, dist };
-
-    rm::complex const theta = -log(num/den) * rm::complex{ 0, 1 };
-
-    return theta.real;
+    tf::Matrix3x3 m(quaternion(imu->orientation));
+    float const pitch = [=,m]()
+    {
+        float pitch;
+        m.getRPY(nullptr, pitch, nullptr);
+        return pitch;
+    }();
+    twist.linear.x = 5*( - pitch) + speed;
+    std::cout << pitch << '\n';
 }
 
 static void correct_pitch(auto const current, auto const target)
 {
     
     cout<< current << std::endl;
-    twist.linear.x = 5*(target - current) + speed;
+    twist.linear.x = (target - current) + speed;
 }
 
 static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
@@ -115,12 +115,7 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
         [](auto const& data){
             return data < min_range || isnan(data) || isinf(data);
         });
-
-    float const robot_pitch = get_wheelie_angle(*back);
-
-    correct_pitch(robot_pitch, pi/3);
-    printf("%1.5f\t%1.5f",robot_pitch, *back);
-    cout<< std::endl;
+    
     // wall follow
 
     int fr_size = 10;
@@ -151,9 +146,26 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
     cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 1, &processLaserScan);
+    ros::Subscriber imu = n.subscribe<sensor_msgs::Imu>("/imu", 10, &get_wheelie_angle);
     
-    start_wheelie();
+    //start_wheelie();
     ros::spin();
 
     return 0;
 }
+/*
+constexpr float get_wheelie_angle(float const dist) noexcept
+{
+    constexpr float wheel_radius = .02;
+    constexpr float lidar_pos_y = .06;
+    constexpr float lidar_pos_x = .04;
+    float const lidar_hyp = std::sqrt(lidar_pos_x*lidar_pos_x+lidar_pos_y+lidar_pos_y);
+
+    rm::complex const num { wheel_radius, -std::sqrt(dist*dist - wheel_radius*wheel_radius + lidar_hyp*lidar_hyp) };
+    rm::complex const den { lidar_hyp, dist };
+
+    rm::complex const theta = -log(num/den) * rm::complex{ 0, 1 };
+
+    return theta.real;
+}
+*/
