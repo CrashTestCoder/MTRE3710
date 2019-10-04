@@ -17,32 +17,27 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <termios.h>
+#include <chrono>
 
 using namespace std;
 using namespace geometry_msgs;
 
-//#define CoarseMode
-#define SPEED 1
 
+bool COARSE_MODE = true;
+bool SPEED = false;
 
 /**********************************/
 /**** define program constants ****/
 /**********************************/
 constexpr float pi = 3.14159265;
-constexpr float min_range = .05;
+constexpr float min_range = .015;
 
 enum wall { left = -1, right = 1 };
 
 constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
 constexpr double setpoint = pi - pi/2 * follow;
 
-#ifdef CoarseMode
-constexpr double setdist = .2; // .27
-#elif SPEED
 constexpr double setdist = .3; // .27
-#else
-constexpr double setdist = .3; // .27
-#endif
 
 /**
  * returns the difference between two angles
@@ -67,6 +62,7 @@ geometry_msgs::Twist twist;
  */
 static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
 {
+    using namespace std::chrono;
     lidar_data = scan->ranges;
     angle_increment = scan->angle_increment;
     angle_min = scan->angle_min;
@@ -90,18 +86,31 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
     double const y_err = (*min_reading - setdist) * -follow;
     double const find_distance = y_err * y_err * y_err * atan(-y_err) * sin(wall_angle);
 
-    // set ouputs
+    double const front_dist = lidar_data[0];
 
-#ifdef CoarseMode
-    twist.linear.x = .3;
-    twist.angular.z = twist.linear.x*7*(2.2*yaw_err + 1.7*y_err);
-#elif SPEED
-    twist.linear.x = 1;
-    twist.angular.z = twist.linear.x*6*(1*yaw_err + .8*y_err);
-#else
-    twist.linear.x = .3;
-    twist.angular.z = twist.linear.x*8*(1*yaw_err + .8*y_err);
-#endif
+    static bool first_fast = false;
+    static auto start = std::chrono::high_resolution_clock().now();
+
+    if(front_dist < 1 || yaw_err > .1)
+    {
+        // Coarse Mode
+        twist.linear.x = .3;
+        twist.angular.z = twist.linear.x*7*(2.2*yaw_err + 1.7*y_err);
+        first_fast = false;
+    }
+    else 
+    {
+        if(!first_fast) start = std::chrono::high_resolution_clock().now(), first_fast = true;
+        // Fast Mode
+        twist.linear.x = .7;
+        twist.angular.z = twist.linear.x*6*(1*yaw_err + .8*y_err);
+
+        if(( std::chrono::high_resolution_clock().now() - start ) < 500ms)
+        {
+            twist.linear.x = .3;
+            twist.angular.z = twist.linear.x*7*(2.2*yaw_err + 1.7*y_err);
+        }
+    }
 
     if(yaw_err > 1) twist.linear.x = 0.05;//, twist.angular.z *=3;
 
