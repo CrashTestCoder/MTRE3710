@@ -11,11 +11,13 @@
 #include "geometry_msgs/Vector3.h"
 #include "sensor_msgs/LaserScan.h"
 
+
 #include "complex.hpp"
 
 #include <vector>
 #include <algorithm>
 #include <limits>
+#include <chrono>
 
 using namespace std;
 using namespace geometry_msgs;
@@ -34,7 +36,14 @@ constexpr float setdist = .25;
 constexpr float def_speed = .25;
 float speed = def_speed;
 
-
+template<typename T, typename F = void(*)(), typename... Params>
+inline void wait(T delay, F unary_predicate = [](Params...) noexcept {}, Params... params)
+{
+    using namespace std::chrono;
+    auto const start = high_resolution_clock().now();
+    while(duration_cast<T>(high_resolution_clock().now() - start) < delay) 
+        unary_predicate(params...);
+}
 
 /*********************************/
 /*         program logic         */
@@ -42,12 +51,13 @@ float speed = def_speed;
 
 void start_wheelie()
 {
+    using namespace std::chrono;
     twist = geometry_msgs::Twist();
 
     twist.linear.x = -1;
     cmd_vel.publish(twist);
 
-    ros::Duration(.1).sleep();
+    wait(.4s);
 
     twist.linear.x = 1;
     cmd_vel.publish(twist);

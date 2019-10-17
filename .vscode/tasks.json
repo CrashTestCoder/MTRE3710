@@ -1,0 +1,19 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "gcc -fconcepts build active file",
+            "command": "gcc -fconcepts",
+            "args": [
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe"
+            ],
+            "options": {
+                "cwd": "."
+            }
+        }
+    ],
+    "version": "2.0.0"
+}
