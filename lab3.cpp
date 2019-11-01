@@ -1,3 +1,4 @@
+
 /**
  * Lab 3 - Wall Follower
  * 
@@ -34,7 +35,7 @@ constexpr float min_range = .05;
 enum wall { left = -1, right = 1 };
 
 constexpr wall follow = wall::right; // for when zane decides the robot should go the other way...
-constexpr double setpoint = pi - pi/2 * follow;
+constexpr double setpoint = pi * follow;
 
 #ifdef CoarseMode
 constexpr double setdist = .2; // .27
@@ -76,6 +77,10 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
     std::replace_if(lidar_data.begin(), lidar_data.end(), [](float const& data) noexcept {
         return data < min_range;
     }, std::numeric_limits<float>::infinity());
+
+    // std::for_each(lidar_data.begin() + 60, lidar_data.end() - 60, [](float& data) noexcept {
+    //     data = std::numeric_limits<float>::infinity();
+    // });
     
     // find wall angle
     auto const& min_reading = std::min_element(lidar_data.begin(), lidar_data.end());
@@ -96,7 +101,7 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
     twist.linear.x = .3;
     twist.angular.z = twist.linear.x*7*(2.2*yaw_err + 1.7*y_err);
 #elif SPEED
-    twist.linear.x = 1;
+    twist.linear.x = -.5 + *min_reading;
     twist.angular.z = twist.linear.x*6*(1*yaw_err + .8*y_err);
 #else
     twist.linear.x = .3;
@@ -105,7 +110,7 @@ static void processLaserScan(sensor_msgs::LaserScan::ConstPtr const &scan)
 
     if(yaw_err > 1) twist.linear.x = 0.05;//, twist.angular.z *=3;
 
-    cout << yaw_err << '\n';
+    cout << yaw_err << '\t' << *min_reading  << '\n';
 
     cmd_vel.publish(twist);
 }
